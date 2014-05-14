@@ -15,6 +15,16 @@ var Mark = {
 
     // Collapse white space between HTML elements in the resulting string.
     compact: false,
+    
+    //Called if pipe not found.
+    // Default implementation writes warning message on console.
+    pipeNotFound:function(pipeName, e){
+    	console.warn('pipe not found:',pipeName,e)
+    },
+    
+    undefinedResult: function(tag){
+    	return '???';
+    },
 
     // Shallow-copy an object.
     _copy: function (a, b) {
@@ -66,6 +76,7 @@ var Mark = {
                 val = this._pipe(result, expressions);
             }
             catch (e) {
+            	this.pipeNotFound(fn,e);
             }
         }
 
@@ -201,6 +212,12 @@ Mark.up = function (template, context, options) {
     if (options.delimiter) {
         this.delimiter = options.delimiter;
     }
+    
+    // Optionally override the undefined result provider.    
+    if (options.undefinedResult) {
+        this.undefinedResult = options.undefinedResult;
+    }
+    
 
     // Optionally collapse white space.
     if (options.compact !== undefined) {
@@ -315,9 +332,14 @@ Mark.up = function (template, context, options) {
         if (testy) {
             result = this._test(result, child, context, options);
         }
+        
+        // Evaluating undefined result
+        if (result === undefined){
+        	result = this.undefinedResult(tag); 
+        } 
 
         // Replace the tag, e.g. "{{name}}", with the result, e.g. "Adam".
-        template = template.replace(tag, result === undefined ? "???" : result);
+        template = template.replace(tag, result);
     }
 
     return this.compact ? template.replace(/>\s+</g, "><") : template;
