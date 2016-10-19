@@ -334,9 +334,9 @@ Mark.up = function (template, context, options) {
         }
         
         // Evaluating undefined result
-        if (result === undefined){
-        	result = this.undefinedResult(tag); 
-        } 
+        if (result === undefined) {
+            result = this.undefinedResult(prop, tag, context, child, filters, this);
+        }
 
         // Replace the tag, e.g. "{{name}}", with the result, e.g. "Adam".
         template = template.replace(tag, result);
