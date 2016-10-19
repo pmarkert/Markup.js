@@ -91,26 +91,29 @@ var Mark = {
     },
 
     // TODO doc
-    _eval: function (context, filters, child) {
+    _eval: function (context, filters, child, as_type) {
         var result = this._pipe(context, filters),
             ctx = result,
             i = -1,
             j,
             opts;
 
-        if (result instanceof Array) {
-            result = "";
-            j = ctx.length;
+        // Only process markup for child elements if not expecting the typed object
+        if (!as_type) { 
+            if (result instanceof Array) {
+                result = "";
+                j = ctx.length;
 
-            while (++i < j) {
-                opts = {
-                    iter: new this._iter(i, j)
-                };
-                result += child ? Mark.up(child, ctx[i], opts) : ctx[i];
+                while (++i < j) {
+                    opts = {
+                        iter: new this._iter(i, j)
+                    };
+                    result += child ? Mark.up(child, ctx[i], opts) : ctx[i];
+                }
             }
-        }
-        else if (result instanceof Object) {
-            result = Mark.up(child, ctx);
+            else if (result instanceof Object) {
+                result = Mark.up(child, ctx);
+            }
         }
 
         return result;
@@ -258,8 +261,9 @@ Mark.up = function (template, context, options) {
         result = undefined;
         child = "";
         selfy = tag.indexOf("/" + this.end_delimiter) > -1;
+        as_type = tag.indexOf(this.start_delimiter + "!") == 0;
 
-        var start_index = this.start_delimiter.length;
+        var start_index = this.start_delimiter.length + (as_type ? 1 : 0);
         var delimiter_lengths = this.start_delimiter.length + this.end_delimiter.length + (selfy ? 1 : 0) + (as_type ? 1 : 0);
         prop = tag.substr(start_index, tag.length - delimiter_lengths)
 
@@ -293,7 +297,7 @@ Mark.up = function (template, context, options) {
 
         // Evaluating a global variable.
         else if ((global = this.globals[prop]) !== undefined) {
-            result = this._eval(global, filters, child);
+            result = this._eval(global, filters, child, as_type);
         }
 
         // Evaluating an included template.
@@ -333,7 +337,7 @@ Mark.up = function (template, context, options) {
                 ctx = ctx[prop[j++]];
             }
 
-            result = this._eval(ctx, filters, child);
+            result = this._eval(ctx, filters, child, as_type);
         }
 
         // Evaluating an "if" statement.
@@ -343,7 +347,7 @@ Mark.up = function (template, context, options) {
 
         // Evaluating an array, which might be a block expression.
         else if (ctx instanceof Array) {
-            result = this._eval(ctx, filters, child);
+            result = this._eval(ctx, filters, child, as_type);
         }
 
         // Evaluating a block expression.
@@ -358,7 +362,7 @@ Mark.up = function (template, context, options) {
 
         // Evaluating special case: if the resulting context is actually an Array
         if (result instanceof Array) {
-            result = this._eval(result, filters, child);
+            result = this._eval(result, filters, child, as_type);
         }
 
         // Evaluating an "if" statement.
@@ -369,6 +373,11 @@ Mark.up = function (template, context, options) {
         // Evaluating undefined result
         if (result === undefined) {
             result = this.undefinedResult(prop, tag, context, child, filters, this);
+        }
+
+        if (as_type && tag == template) {
+            // If the entire template is a single tag, then return the result without "stringifying" it.
+            return result;
         }
 
         // Replace the tag, e.g. "{{name}}", with the result, e.g. "Adam".

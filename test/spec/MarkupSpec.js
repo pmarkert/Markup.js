@@ -30,12 +30,16 @@ describe("Markup core spec", function () {
         obj: { truthy: true, falsy: false },
         _chars: [ ["a","b","c"], ["d","e","f"] ],
         $price: "$123,456.78",
-        $products: ["apple", "orange"]
+        $products: ["apple", "orange"],
+        order: { id: "abc123", free_shipping: true, items: [ { name: "milk", quantity: 1 }, { name: "bacon", quantity : 3 } ] },
+        now: new Date()
     };
 
     beforeEach(function () {
         Mark.delimiter = ">";
         Mark.compact = false;
+        Mark.start_delimiter = "{{";
+        Mark.end_delimiter = "}}";
         template = "";
         result = "";
     });
@@ -1243,6 +1247,112 @@ describe("Markup core spec", function () {
         result = Mark.up(template, { name: "Adam", apples: 1 });
 
         expect(result).toEqual("<p>Hi Adam! You have one apple.</p>");
+    });
+
+    it("resolves with alternate delimiters", function () {
+        template = "gender: <%gender%>";
+        result = Mark.up(template, context, { start_delimiter: "<%", end_delimiter: "%>" });
+        expect(result).toEqual("gender: male");
+
+        template = "gender: <% gender %>";
+        result = Mark.up(template, context, { start_delimiter: "<%", end_delimiter: "%>" });
+        expect(result).toEqual("gender: male");
+
+        template = "gender: <% gender | upcase %>";
+        result = Mark.up(template, context, { start_delimiter: "<%", end_delimiter: "%>" });
+        expect(result).toEqual("gender: MALE");
+
+        template = "gender: <% gender | upcase | downcase %>";
+        result = Mark.up(template, context, { start_delimiter: "<%", end_delimiter: "%>" });
+        expect(result).toEqual("gender: male");
+
+        template = "price: <%$price%>";
+        result = Mark.up(template, context, { start_delimiter: "<%", end_delimiter: "%>" });
+        expect(result).toEqual("price: $123,456.78");
+    });
+
+    it("resolves a string value as type", function () {
+        template = "{{!gender}}";
+        result = Mark.up(template, context);
+        expect(result).toBe(context.gender);
+    });
+
+    it("resolves a truthy value as type", function () {
+        template = "{{!truthy}}";
+        result = Mark.up(template, context);
+        expect(result).toBe(context.truthy);
+    });
+
+    it("resolves a falsy value as type", function () {
+        template = "{{!falsy}}";
+        result = Mark.up(template, context);
+        expect(result).toBe(context.falsy);
+    });
+
+    it("resolves a numeric value as type", function () {
+        template = "{{!weight}}";
+        result = Mark.up(template, context);
+        expect(result).toBe(context.weight);
+    });
+
+    it("resolves a null value as type", function () {
+        template = "{{!race}}";
+        result = Mark.up(template, context);
+        expect(result).toBe(context.race);
+    });
+
+    it("resolves an array of scalars as type", function () {
+        template = "{{!brothers}}";
+        result = Mark.up(template, context);
+        expect(result).toBe(context.brothers);
+    });
+
+    it("resolves an object as type", function () {
+        template = "{{!obj}}";
+        result = Mark.up(template, context);
+        expect(result).toBe(context.obj);
+    });
+
+    it("resolves a date as type", function () {
+        template = "{{!now}}";
+        result = Mark.up(template, context);
+        expect(result).toBe(context.now);
+    });
+
+    it("resolves an array of objects as type", function () {
+        template = "{{!sisters}}";
+        result = Mark.up(template, context);
+        expect(result).toBe(context.sisters);
+    });
+
+    it("resolves a scalar with $ in the name as type", function () {
+        template = "{{!$price}}";
+        result = Mark.up(template, context);
+        expect(result).toBe(context["$price"]);
+    });
+
+    it("resolves an element (array) at an array index as type", function () {
+        template = "{{!_chars.0}}";
+        result = Mark.up(template, context);
+        expect(result).toBe(context._chars[0]);
+    });
+
+    it("resolves the length of an array as type", function () {
+        template = "{{!brothers.length}}";
+        result = Mark.up(template, context);
+        expect(result).toBe(3);
+    });
+       
+    it("resolves a numeric value of a specific element within an array as type", function () {
+        template = "{{!order.items.1.quantity}}";
+        result = Mark.up(template, context);
+        expect(result).toBe(context.order.items[1].quantity);
+    });
+
+    it("resolves an objects array property's length as type", function () {
+        template = "{{!order.items.length}}";
+        result = Mark.up(template, context);
+        expect(result).toBe(context.order.items.length);
     });
 
 });
