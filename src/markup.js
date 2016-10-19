@@ -13,6 +13,12 @@ var Mark = {
     // The delimiter to use in pipe expressions, e.g. {{if color|like>red}}.
     delimiter: ">",
 
+    // The start delimiter to use for tags
+    start_delimiter: "{{",
+
+    // The end delimiter to use for tags
+    end_delimiter: "}}",
+
     // Collapse white space between HTML elements in the resulting string.
     compact: false,
     
@@ -113,7 +119,7 @@ var Mark = {
     // Process the contents of an IF or IF/ELSE block.
     _test: function (bool, child, context, options) {
         // Process the child string, then split it into the IF and ELSE parts.
-        var str = Mark.up(child, context, options).split(/\{\{\s*else\s*\}\}/);
+        var str = Mark.up(child, context, options).split(new RegExp(re_escape(this.start_delimiter) + "\\s*else\\s*" + re_escape(this.end_delimiter)));
 
         // Return the IF or ELSE part. If no ELSE, return an empty string.
         return (bool === false ? str[1] : str[0]) || "";
@@ -123,7 +129,7 @@ var Mark = {
     _bridge: function (tpl, tkn) {
         tkn = tkn == "." ? "\\." : tkn.replace(/\$/g, "\\$");
 
-        var exp = "{{\\s*" + tkn + "([^/}]+\\w*)?}}|{{/" + tkn + "\\s*}}",
+        var exp = this.start_delimiter + "\\s*" + tkn + "([^/}]+\\w*)?" + this.end_delimiter + "|" + this.start_delimiter + "/" + tkn + "\\s*" + this.end_delimiter,
             re = new RegExp(exp, "g"),
             tags = tpl.match(re) || [],
             t,
@@ -137,7 +143,7 @@ var Mark = {
             t = i;
             c = tpl.indexOf(tags[t], c + 1);
 
-            if (tags[t].indexOf("{{/") > -1) {
+            if (tags[t].indexOf(this.start_delimiter + "/") > -1) {
                 b++;
             }
             else {
@@ -163,36 +169,6 @@ Mark.up = function (template, context, options) {
     context = context || {};
     options = options || {};
 
-    // Match all tags like "{{...}}".
-    var re = /\{\{(.+?)\}\}/g,
-        // All tags in the template.
-        tags = template.match(re) || [],
-        // The tag being evaluated, e.g. "{{hamster|dance}}".
-        tag,
-        // The expression to evaluate inside the tag, e.g. "hamster|dance".
-        prop,
-        // The token itself, e.g. "hamster".
-        token,
-        // An array of pipe expressions, e.g. ["more>1", "less>2"].
-        filters = [],
-        // Does the tag close itself? e.g. "{{stuff/}}".
-        selfy,
-        // Is the tag an "if" statement?
-        testy,
-        // The contents of a block tag, e.g. "{{aa}}bb{{/aa}}" -> "bb".
-        child,
-        // The resulting string.
-        result,
-        // The global variable being evaluated, or undefined.
-        global,
-        // The included template being evaluated, or undefined.
-        include,
-        // A placeholder variable.
-        ctx,
-        // Iterators.
-        i = 0,
-        j = 0;
-
     // Set custom pipes, if provided.
     if (options.pipes) {
         this._copy(options.pipes, this.pipes);
@@ -212,26 +188,83 @@ Mark.up = function (template, context, options) {
     if (options.delimiter) {
         this.delimiter = options.delimiter;
     }
-    
-    // Optionally override the undefined result provider.    
-    if (options.undefinedResult) {
+
+    // Optionally override the start_delimiter.
+    if (options.start_delimiter) {
+        this.start_delimiter = options.start_delimiter;
+    }
+
+    // Optionally override the end_delimiter.
+    if (options.end_delimiter) {
+        this.end_delimiter = options.end_delimiter;
+    }
+
+    // Optionally override the undefined result provider.
+    if(options.undefinedResult) {
         this.undefinedResult = options.undefinedResult;
     }
-    
+
+    // Optionally override the pipe not-found handler.
+    if(options.pipeNotFound) {
+        this.pipeNotFound = options.pipeNotFound;
+    }
+
+    // Optionally override the pipeline error handler.
+    if(options.pipeExecutionError) {
+        this.pipeExecutionError = options.pipeExecutionError;
+    }
 
     // Optionally collapse white space.
     if (options.compact !== undefined) {
         this.compact = options.compact;
     }
 
+    // Match all tags like "{{...}}".
+    var re = new RegExp(re_escape(this.start_delimiter) + "(.+?)" + re_escape(this.end_delimiter),"g"),
+        // All tags in the template.
+        tags = template.match(re) || [],
+        // The tag being evaluated, e.g. "{{hamster|dance}}".
+        tag,
+        // The expression to evaluate inside the tag, e.g. "hamster|dance".
+        prop,
+        // The token itself, e.g. "hamster".
+        token,
+        // An array of pipe expressions, e.g. ["more>1", "less>2"].
+        filters = [],
+        // Does the tag close itself? e.g. "{{stuff/}}".
+        selfy,
+        // Is the tag an "if" statement?
+        testy,
+        // Return the actual typed object result instead of a string representation
+        as_type,
+        // The contents of a block tag, e.g. "{{aa}}bb{{/aa}}" -> "bb".
+        child,
+        // The resulting string.
+        result,
+        // The global variable being evaluated, or undefined.
+        global,
+        // The included template being evaluated, or undefined.
+        include,
+        // A placeholder variable.
+        ctx,
+        // captured reference for use inside of closures
+        self = this, 
+        // Iterators.
+        i = 0,
+        j = 0;
+
     // Loop through tags, e.g. {{a}}, {{b}}, {{c}}, {{/c}}.
     while ((tag = tags[i++])) {
         result = undefined;
         child = "";
-        selfy = tag.indexOf("/}}") > -1;
-        prop = tag.substr(2, tag.length - (selfy ? 5 : 4));
+        selfy = tag.indexOf("/" + this.end_delimiter) > -1;
+
+        var start_index = this.start_delimiter.length;
+        var delimiter_lengths = this.start_delimiter.length + this.end_delimiter.length + (selfy ? 1 : 0) + (as_type ? 1 : 0);
+        prop = tag.substr(start_index, tag.length - delimiter_lengths)
+
         prop = prop.replace(/`(.+?)`/g, function (s, p1) {
-            return Mark.up("{{" + p1 + "}}", context);
+            return Mark.up(self.start_delimiter + p1 + self.end_delimiter, context);
         });
         testy = prop.trim().indexOf("if ") === 0;
         filters = prop.split("|");
@@ -246,7 +279,7 @@ Mark.up = function (template, context, options) {
         }
 
         // Does the tag have a corresponding closing tag? If so, find it and move the cursor.
-        if (!selfy && template.indexOf("{{/" + token) > -1) {
+        if (!selfy && template.indexOf(this.start_delimiter + "/" + token) > -1) {
             result = this._bridge(template, token);
             tag = result[0];
             child = result[1];
@@ -254,7 +287,7 @@ Mark.up = function (template, context, options) {
         }
 
         // Skip "else" tags. These are pulled out in _test().
-        if (/^\{\{\s*else\s*\}\}$/.test(tag)) {
+        if (new RegExp("^" + re_escape(this.start_delimiter) + "\\s*else\\s*" + re_escape(this.end_delimiter) + "$").test(tag)) {
             continue;
         }
 
@@ -486,6 +519,11 @@ Mark.pipes = {
         return obj;
     }
 };
+
+function re_escape(str) {
+    // From: http://stackoverflow.com/questions/3446170/escape-string-for-use-in-javascript-regex
+    return str.replace(/[\-\[\]\/\{\}\(\)\*\+\?\.\\\^\$\|]/g, "\\$&");
+}
 
 // Shim for IE.
 if (typeof String.prototype.trim !== "function") {
