@@ -9,6 +9,11 @@
     "files": [
         "src/markup.js",
         "src/markup.min.js",
+        "src/extras/arrays.js",
+        "src/extras/dates.js",
+        "src/extras/i18n.js",
+        "src/extras/numbers.js",
+        "src/extras/strings.js",
         "README.md"
     ],
     "keywords": [
