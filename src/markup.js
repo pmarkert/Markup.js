@@ -122,7 +122,10 @@ var Mark = {
     // Process the contents of an IF or IF/ELSE block.
     _test: function (bool, child, context, options) {
         // Process the child string, then split it into the IF and ELSE parts.
+	var previous_undefinedResult = options.undefinedResult;
+	options.undefinedResult = function() { return ""; }
         var str = Mark.up(child, context, options).split(new RegExp(re_escape(this.start_delimiter) + "\\s*else\\s*" + re_escape(this.end_delimiter)));
+	this.undefinedResult = previous_undefinedResult;
 
         // Return the IF or ELSE part. If no ELSE, return an empty string.
         return (bool === false ? str[1] : str[0]) || "";
@@ -131,8 +134,7 @@ var Mark = {
     // Determine the extent of a block expression, e.g. "{{foo}}...{{/foo}}"
     _bridge: function (tpl, tkn) {
         tkn = tkn == "." ? "\\." : tkn.replace(/\$/g, "\\$");
-
-        var exp = this.start_delimiter + "\\s*" + tkn + "([^/}]+\\w*)?" + this.end_delimiter + "|" + this.start_delimiter + "/" + tkn + "\\s*" + this.end_delimiter,
+        var exp = this.start_delimiter + "\\s*" + tkn + "([^/" + re_escape(this.end_delimiter) + "]+\\w*)?" + this.end_delimiter + "|" + this.start_delimiter + "/" + tkn + "\\s*" + this.end_delimiter,
             re = new RegExp(exp, "g"),
             tags = tpl.match(re) || [],
             t,
