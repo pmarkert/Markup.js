@@ -21,15 +21,19 @@ var Mark = {
 
     // Collapse white space between HTML elements in the resulting string.
     compact: false,
-    
+
     //Called if pipe not found.
     // Default implementation writes warning message on console.
-    pipeNotFound:function(pipeName, e){
-    	console.warn('pipe not found:',pipeName,e)
+    pipeNotFound:function(pipeName){
+        console.warn('pipe not found:',pipeName)
     },
-    
+
+    pipeExecutionError: function(pipeName, e) {
+        console.error('pipe execution error: ' + pipeName + " - " + e);
+    },
+
     undefinedResult: function(tag){
-    	return '???';
+        return '???';
     },
 
     // Shallow-copy an object.
@@ -74,6 +78,10 @@ var Mark = {
             // Pull out the function name, e.g. "add".
             fn = parts.shift().trim();
 
+        if(typeof(Mark.pipes[fn])==="undefined") {
+            this.pipeNotFound(fn);
+        }
+
             try {
                 // Run the function, e.g. add(123, 10) ...
                 result = Mark.pipes[fn].apply(null, [val].concat(parts));
@@ -82,7 +90,7 @@ var Mark = {
                 val = this._pipe(result, expressions);
             }
             catch (e) {
-            	this.pipeNotFound(fn,e);
+                this.pipeExecutionError(fn,e);
             }
         }
 
@@ -99,7 +107,7 @@ var Mark = {
             opts;
 
         // Only process markup for child elements if not expecting the typed object
-        if (!as_type) { 
+        if (!as_type) {
             if (result instanceof Array) {
                 result = "";
                 j = ctx.length;
@@ -122,10 +130,10 @@ var Mark = {
     // Process the contents of an IF or IF/ELSE block.
     _test: function (bool, child, context, options) {
         // Process the child string, then split it into the IF and ELSE parts.
-	var previous_undefinedResult = options.undefinedResult;
-	options.undefinedResult = function() { return ""; }
+        var previous_undefinedResult = options.undefinedResult;
+        options.undefinedResult = function() { return ""; }
         var str = Mark.up(child, context, options).split(new RegExp(re_escape(this.start_delimiter) + "\\s*else\\s*" + re_escape(this.end_delimiter)));
-	this.undefinedResult = previous_undefinedResult;
+        this.undefinedResult = previous_undefinedResult;
 
         // Return the IF or ELSE part. If no ELSE, return an empty string.
         return (bool === false ? str[1] : str[0]) || "";
@@ -214,6 +222,10 @@ Mark.up = function (template, context, options) {
         this.pipeNotFound = options.pipeNotFound;
     }
 
+    if(options.pipeExecutionError) {
+        this.pipeExecutionError = options.pipeExecutionError;
+    }
+
     // Optionally override the pipeline error handler.
     if(options.pipeExecutionError) {
         this.pipeExecutionError = options.pipeExecutionError;
@@ -253,7 +265,7 @@ Mark.up = function (template, context, options) {
         // A placeholder variable.
         ctx,
         // captured reference for use inside of closures
-        self = this, 
+        self = this,
         // Iterators.
         i = 0,
         j = 0;
@@ -371,7 +383,7 @@ Mark.up = function (template, context, options) {
         if (testy) {
             result = this._test(result, child, context, options);
         }
-        
+
         // Evaluating undefined result
         if (result === undefined) {
             result = this.undefinedResult(prop, tag, context, child, filters, this);
@@ -539,7 +551,7 @@ function re_escape(str) {
 // Shim for IE.
 if (typeof String.prototype.trim !== "function") {
     String.prototype.trim = function() {
-        return this.replace(/^\s+|\s+$/g, ""); 
+        return this.replace(/^\s+|\s+$/g, "");
     }
 }
 
