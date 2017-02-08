@@ -28,7 +28,7 @@ var Mark = {
         console.warn('pipe not found:',pipeName)
     },
 
-    pipeExecutionError: function(pipeName, e) {
+    pipeExecutionError: function(e, pipeName) {
         console.error('pipe execution error: ' + pipeName + " - " + e);
     },
 
@@ -90,7 +90,7 @@ var Mark = {
                 val = this._pipe(result, expressions);
             }
             catch (e) {
-                this.pipeExecutionError(fn,e);
+                this.pipeExecutionError(e, fn);
             }
         }
 
